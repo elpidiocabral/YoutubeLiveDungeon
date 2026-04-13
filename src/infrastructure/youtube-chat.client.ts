@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { LiveChat } from 'youtube-chat';
+import type { YoutubeId } from 'youtube-chat/dist/types/data';
 import type { IChatSource } from '../core/ports';
 import type { UnifiedChatMessage } from '../core/entities';
 import { adaptYouTubeChatItem } from '../adapters/youtube.adapter';
@@ -17,7 +18,11 @@ export class YouTubeChatClient extends EventEmitter implements IChatSource {
 
   private readonly circuitBreaker: CircuitBreaker;
 
-  constructor() {
+  /**
+   * @param youtubeIdOverride — Quando fornecido, sobrescreve as variáveis de ambiente.
+   *   Use para receber o liveId dinamicamente via API.
+   */
+  constructor(private readonly youtubeIdOverride?: YoutubeId) {
     super();
     this.circuitBreaker = new CircuitBreaker('youtube-chat', {
       failureThreshold: config.circuitBreaker.failureThreshold,
@@ -37,10 +42,11 @@ export class YouTubeChatClient extends EventEmitter implements IChatSource {
       return;
     }
 
-    const youtubeId =
-      config.youtube.liveId
+    const youtubeId: YoutubeId =
+      this.youtubeIdOverride ??
+      (config.youtube.liveId
         ? { liveId: config.youtube.liveId }
-        : { channelId: config.youtube.channelId };
+        : { channelId: config.youtube.channelId });
 
     logger.info('[YouTube] Iniciando conexão com live chat', { youtubeId });
 

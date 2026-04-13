@@ -1,4 +1,5 @@
 import express, { type Application } from 'express';
+import cors from 'cors';
 import { createServer, type Server as HttpServer } from 'http';
 import { healthRouter } from '../api/health.controller';
 import { logger } from '../utils/logger';
@@ -10,6 +11,7 @@ export class ExpressServer {
 
   constructor() {
     this.app = express();
+    this.app.use(cors());
     this.app.use(express.json());
     this.app.use('/health', healthRouter);
     this.httpServer = createServer(this.app);

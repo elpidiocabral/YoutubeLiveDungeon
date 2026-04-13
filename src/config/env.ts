@@ -43,14 +43,12 @@ export const config = {
 
 export type AppConfig = typeof config;
 
-/** Valida que pelo menos uma fonte está configurada */
+/** Valida a configuração no startup. YouTube agora é controlado via API em runtime. */
 export function validateConfig(): void {
-  const hasYoutube = Boolean(config.youtube.channelId || config.youtube.liveId);
-  const hasDiscord = Boolean(config.discord.token);
-
-  if (!hasYoutube && !hasDiscord) {
-    throw new Error(
-      'Nenhuma fonte de chat configurada. Defina YOUTUBE_CHANNEL_ID/YOUTUBE_LIVE_ID e/ou DISCORD_TOKEN no .env'
+  if (!config.discord.token && config.discord.channelIds.length === 0) {
+    console.warn(
+      '[Config] DISCORD_TOKEN não definido — fonte Discord inativa. ' +
+        'Para YouTube, use POST /api/youtube/start com a URL da live.'
     );
   }
 }

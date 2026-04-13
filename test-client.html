@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>AnimaDungeon — Chat Test</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 16px; margin: 0; }
+    h2 { color: #e94560; margin-top: 0; }
+
+    /* ── Layout ── */
+    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+    /* ── Panel ── */
+    .panel { background: #16213e; border-radius: 6px; padding: 14px; }
+    .panel h3 { margin: 0 0 12px; color: #a0aec0; font-size: 13px; text-transform: uppercase; }
+
+    /* ── Status bar ── */
+    #ws-status { font-size: 12px; padding: 6px 10px; border-radius: 4px; margin-bottom: 14px;
+      border-left: 3px solid #e94560; background: #16213e; }
+    #ws-status.connected { border-color: #00ff88; }
+
+    /* ── Live control ── */
+    .form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .form-row input {
+      flex: 1; background: #0f3460; border: 1px solid #334; color: #eee;
+      padding: 8px 10px; border-radius: 4px; font-size: 13px; font-family: monospace;
+    }
+    .form-row input:focus { outline: 2px solid #e94560; }
+    button {
+      padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-family: monospace; font-weight: bold;
+    }
+    .btn-start { background: #00b894; color: #000; }
+    .btn-start:disabled { opacity: .4; cursor: default; }
+    .btn-stop  { background: #e94560; color: #fff; }
+    .btn-stop:disabled  { opacity: .4; cursor: default; }
+
+    #live-status { font-size: 12px; color: #a0aec0; min-height: 18px; }
+    #live-status.active { color: #00ff88; }
+    #live-status.error  { color: #e94560; }
+
+    /* ── Stats ── */
+    .stat { font-size: 12px; color: #a0aec0; margin: 4px 0; }
+    .stat span { color: #eee; }
+
+    /* ── Message feed ── */
+    #log { list-style: none; padding: 0; margin: 0; max-height: 65vh; overflow-y: auto; }
+    #log li {
+      background: #0f3460; margin: 5px 0; padding: 9px 12px;
+      border-radius: 4px; border-left: 3px solid #1a1a2e; font-size: 13px;
+      animation: fadeIn .2s ease;
+    }
+    #log li.youtube { border-color: #e94560; }
+    #log li.discord  { border-color: #7289da; }
+    #log li.mock     { border-color: #f6c90e; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+    .msg-meta  { font-size: 10px; color: #718096; margin-bottom: 3px; }
+    .msg-author { color: #e94560; font-weight: bold; }
+    .msg-content { color: #cbd5e0; word-break: break-word; }
+    .badge { font-size: 10px; background: #1a1a2e; padding: 1px 6px; border-radius: 3px; margin-left: 5px; vertical-align: middle; }
+    .superchat { color: #ffd700; font-weight: bold; margin-left: 6px; }
+    #empty-state { color: #4a5568; font-size: 13px; text-align: center; padding: 32px 0; }
+  </style>
+</head>
+<body>
+  <h2>AnimaDungeon — Chat Monitor</h2>
+
+  <div id="ws-status">WebSocket: conectando...</div>
+
+  <div class="grid">
+    <!-- ── Controle ── -->
+    <div>
+      <div class="panel">
+        <h3>YouTube Live</h3>
+        <div class="form-row">
+          <input id="yt-url" type="text"
+            placeholder="URL ou ID da live (ex: dQw4w9WgXcQ)" />
+        </div>
+        <div class="form-row">
+          <button class="btn-start" id="btn-start">▶ Iniciar</button>
+          <button class="btn-stop"  id="btn-stop" disabled>■ Parar</button>
+        </div>
+        <div id="live-status">Nenhuma live ativa</div>
+      </div>
+
+      <div class="panel" style="margin-top:12px;">
+        <h3>Estatísticas</h3>
+        <div class="stat">Mensagens recebidas: <span id="stat-total">0</span></div>
+        <div class="stat">YouTube: <span id="stat-yt">0</span></div>
+        <div class="stat">Discord: <span id="stat-dc">0</span></div>
+        <div class="stat">Mock: <span id="stat-mock">0</span></div>
+      </div>
+    </div>
+
+    <!-- ── Feed ── -->
+    <div class="panel">
+      <h3>Feed de mensagens</h3>
+      <ul id="log">
+        <li id="empty-state">Aguardando mensagens...</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const API = 'http://localhost:3001';
+    const socket = io(API);
+
+    // ── WebSocket status ──────────────────────────────────────
+    const wsStatus = document.getElementById('ws-status');
+    socket.on('connect', () => {
+      wsStatus.textContent = `WebSocket: conectado  (id: ${socket.id})`;
+      wsStatus.className = 'connected';
+      refreshStatus();
+    });
+    socket.on('disconnect', () => {
+      wsStatus.textContent = 'WebSocket: desconectado';
+      wsStatus.className = '';
+    });
+
+    // ── Stats ─────────────────────────────────────────────────
+    const stats = { total: 0, youtube: 0, discord: 0, mock: 0 };
+    function updateStats(source) {
+      stats.total++;
+      if (source in stats) stats[source]++;
+      document.getElementById('stat-total').textContent = stats.total;
+      document.getElementById('stat-yt').textContent   = stats.youtube;
+      document.getElementById('stat-dc').textContent   = stats.discord;
+      document.getElementById('stat-mock').textContent = stats.mock;
+    }
+
+    // ── Message feed ──────────────────────────────────────────
+    const log = document.getElementById('log');
+    socket.on('chat:message', (msg) => {
+      const empty = document.getElementById('empty-state');
+      if (empty) empty.remove();
+
+      updateStats(msg.source);
+
+      const badges = [
+        msg.metadata.isOwner     ? '<span class="badge">owner</span>' : '',
+        msg.metadata.isModerator ? '<span class="badge">mod</span>'   : '',
+        msg.metadata.isMember    ? '<span class="badge">membro</span>': '',
+        msg.metadata.superchat
+          ? `<span class="superchat">💰 ${msg.metadata.superchat.amount}</span>` : '',
+      ].join('');
+
+      const li = document.createElement('li');
+      li.className = msg.source;
+      li.innerHTML = `
+        <div class="msg-meta">[${msg.source}] ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+        <span class="msg-author">${escHtml(msg.author.name)}</span>${badges}:
+        <span class="msg-content">${escHtml(msg.content)}</span>
+      `;
+      log.prepend(li);
+      if (log.children.length > 150) log.lastElementChild?.remove();
+    });
+
+    // ── Live control ──────────────────────────────────────────
+    const btnStart   = document.getElementById('btn-start');
+    const btnStop    = document.getElementById('btn-stop');
+    const liveStatus = document.getElementById('live-status');
+    const urlInput   = document.getElementById('yt-url');
+
+    async function refreshStatus() {
+      try {
+        const res  = await fetch(`${API}/api/youtube/status`);
+        const data = await res.json();
+        if (data.active) {
+          setActiveState(data.liveId);
+        } else {
+          setIdleState();
+        }
+      } catch { /* servidor offline */ }
+    }
+
+    function setActiveState(liveId) {
+      liveStatus.textContent = `✔ Live ativa: ${liveId}`;
+      liveStatus.className = 'active';
+      btnStart.disabled = true;
+      btnStop.disabled  = false;
+    }
+
+    function setIdleState() {
+      liveStatus.textContent = 'Nenhuma live ativa';
+      liveStatus.className = '';
+      btnStart.disabled = false;
+      btnStop.disabled  = true;
+    }
+
+    btnStart.addEventListener('click', async () => {
+      const url = urlInput.value.trim();
+      if (!url) { urlInput.focus(); return; }
+
+      btnStart.disabled = true;
+      liveStatus.textContent = 'Conectando...';
+      liveStatus.className = '';
+
+      try {
+        const res  = await fetch(`${API}/api/youtube/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setActiveState(data.liveId);
+        } else {
+          liveStatus.textContent = `Erro: ${data.error}`;
+          liveStatus.className = 'error';
+          btnStart.disabled = false;
+        }
+      } catch (err) {
+        liveStatus.textContent = `Falha de rede: ${err.message}`;
+        liveStatus.className = 'error';
+        btnStart.disabled = false;
+      }
+    });
+
+    btnStop.addEventListener('click', async () => {
+      btnStop.disabled = true;
+      await fetch(`${API}/api/youtube/stop`, { method: 'POST' }).catch(() => {});
+      setIdleState();
+    });
+
+    // Enter no input dispara start
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btnStart.click();
+    });
+
+    // ── Utils ─────────────────────────────────────────────────
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>
