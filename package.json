@@ -8,6 +8,7 @@
     "dev": "ts-node src/dev-server.ts",
     "dev:mock": "ts-node src/dev-server.ts --mock",
     "dev:discord": "ts-node src/dev-discord-test.ts",
+    "local": "powershell -ExecutionPolicy Bypass -File .\\start-local.ps1",
     "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

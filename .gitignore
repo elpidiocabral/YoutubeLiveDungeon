@@ -19,3 +19,7 @@ Thumbs.db
 # Editor
 .vscode/settings.json
 .idea/
+
+# Script local
+start-local.ps1
+cloudflared.exe
