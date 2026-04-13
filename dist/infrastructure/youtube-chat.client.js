@@ -8,8 +8,13 @@ const circuit_breaker_1 = require("../services/circuit-breaker");
 const env_1 = require("../config/env");
 const logger_1 = require("../utils/logger");
 class YouTubeChatClient extends events_1.EventEmitter {
-    constructor() {
+    /**
+     * @param youtubeIdOverride — Quando fornecido, sobrescreve as variáveis de ambiente.
+     *   Use para receber o liveId dinamicamente via API.
+     */
+    constructor(youtubeIdOverride) {
         super();
+        this.youtubeIdOverride = youtubeIdOverride;
         this.sourceId = 'youtube';
         this.liveChat = null;
         this.reconnectAttempts = 0;
@@ -30,9 +35,10 @@ class YouTubeChatClient extends events_1.EventEmitter {
             this.scheduleReconnect();
             return;
         }
-        const youtubeId = env_1.config.youtube.liveId
-            ? { liveId: env_1.config.youtube.liveId }
-            : { channelId: env_1.config.youtube.channelId };
+        const youtubeId = this.youtubeIdOverride ??
+            (env_1.config.youtube.liveId
+                ? { liveId: env_1.config.youtube.liveId }
+                : { channelId: env_1.config.youtube.channelId });
         logger_1.logger.info('[YouTube] Iniciando conexão com live chat', { youtubeId });
         this.liveChat = new youtube_chat_1.LiveChat(youtubeId);
         this.attachHandlers(this.liveChat);

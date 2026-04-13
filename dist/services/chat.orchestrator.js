@@ -8,14 +8,16 @@ const logger_1 = require("../utils/logger");
  * e publica as mensagens normalizadas no barramento interno.
  */
 class ChatOrchestrator {
-    constructor(sources, messageBus) {
+    constructor(sources, messageBus, filter) {
         this.messageBus = messageBus;
+        this.filter = filter;
         this.sources = sources;
     }
     async startAll() {
         for (const source of this.sources) {
             source.on('message', (msg) => {
-                this.messageBus.publish(msg);
+                if (this.filter.passes(msg))
+                    this.messageBus.publish(msg);
             });
             source.on('error', (err) => {
                 logger_1.logger.error(`[Orchestrator] Erro na fonte "${source.sourceId}"`, {

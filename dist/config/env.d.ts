@@ -18,6 +18,6 @@ export declare const config: {
     };
 };
 export type AppConfig = typeof config;
-/** Valida que pelo menos uma fonte está configurada */
+/** Valida a configuração no startup. YouTube agora é controlado via API em runtime. */
 export declare function validateConfig(): void;
 //# sourceMappingURL=env.d.ts.map

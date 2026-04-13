@@ -40,12 +40,11 @@ exports.config = {
         recoveryTimeoutMs: optionalInt('CB_RECOVERY_TIMEOUT_MS', 30000),
     },
 };
-/** Valida que pelo menos uma fonte está configurada */
+/** Valida a configuração no startup. YouTube agora é controlado via API em runtime. */
 function validateConfig() {
-    const hasYoutube = Boolean(exports.config.youtube.channelId || exports.config.youtube.liveId);
-    const hasDiscord = Boolean(exports.config.discord.token);
-    if (!hasYoutube && !hasDiscord) {
-        throw new Error('Nenhuma fonte de chat configurada. Defina YOUTUBE_CHANNEL_ID/YOUTUBE_LIVE_ID e/ou DISCORD_TOKEN no .env');
+    if (!exports.config.discord.token && exports.config.discord.channelIds.length === 0) {
+        console.warn('[Config] DISCORD_TOKEN não definido — fonte Discord inativa. ' +
+            'Para YouTube, use POST /api/youtube/start com a URL da live.');
     }
 }
 //# sourceMappingURL=env.js.map

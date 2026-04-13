@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ExpressServer = void 0;
 const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
 const http_1 = require("http");
 const health_controller_1 = require("../api/health.controller");
 const logger_1 = require("../utils/logger");
@@ -12,6 +13,7 @@ const env_1 = require("../config/env");
 class ExpressServer {
     constructor() {
         this.app = (0, express_1.default)();
+        this.app.use((0, cors_1.default)());
         this.app.use(express_1.default.json());
         this.app.use('/health', health_controller_1.healthRouter);
         this.httpServer = (0, http_1.createServer)(this.app);
