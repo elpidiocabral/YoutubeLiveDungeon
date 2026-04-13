@@ -19,6 +19,9 @@ import { ChatFilter } from './services/chat-filter';
 import { createYoutubeRouter } from './api/youtube.controller';
 import { createSettingsRouter } from './api/settings.controller';
 import { MockChatSource } from './infrastructure/mock-chat.source';
+import { DiscordChatClient } from './infrastructure/discord.client';
+import type { IChatSource } from './core/ports';
+import { config } from './config/env';
 import { logger } from './utils/logger';
 
 const args = process.argv.slice(2);
@@ -41,6 +44,20 @@ async function main(): Promise<void> {
 
   await expressServer.listen();
 
+  // ── Fontes estáticas (Discord, etc.) ────────────────────────
+  const staticSources: IChatSource[] = [];
+  if (config.discord.token) {
+    staticSources.push(new DiscordChatClient());
+    logger.info('  Discord:   token encontrado — iniciando bot...');
+  } else {
+    logger.info('  Discord:   DISCORD_TOKEN não definido — fonte desativada');
+  }
+
+  if (staticSources.length > 0) {
+    const staticOrchestrator = new ChatOrchestrator(staticSources, messageBus, chatFilter);
+    await staticOrchestrator.startAll();
+  }
+
   logger.info('──────────────────────────────────────────────');
   logger.info('  Dev Server pronto!');
   logger.info('  Health:    http://localhost:3001/health');
@@ -51,11 +68,11 @@ async function main(): Promise<void> {
 
   if (useMock) {
     const mock = new MockChatSource(intervalMs);
-    const orchestrator = new ChatOrchestrator([mock], messageBus, chatFilter);
-    await orchestrator.startAll();
+    const mockOrchestrator = new ChatOrchestrator([mock], messageBus, chatFilter);
+    await mockOrchestrator.startAll();
 
     const shutdown = (): void => {
-      orchestrator.stopAll();
+      mockOrchestrator.stopAll();
       youtubeLiveService.stopLive();
       void expressServer.close();
       process.exit(0);
