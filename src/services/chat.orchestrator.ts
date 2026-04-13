@@ -1,4 +1,5 @@
 import type { IChatSource, IMessageBus } from '../core/ports';
+import type { ChatFilter } from './chat-filter';
 import { logger } from '../utils/logger';
 
 /**
@@ -11,7 +12,8 @@ export class ChatOrchestrator {
 
   constructor(
     sources: IChatSource[],
-    private readonly messageBus: IMessageBus
+    private readonly messageBus: IMessageBus,
+    private readonly filter: ChatFilter
   ) {
     this.sources = sources;
   }
@@ -19,7 +21,7 @@ export class ChatOrchestrator {
   async startAll(): Promise<void> {
     for (const source of this.sources) {
       source.on('message', (msg) => {
-        this.messageBus.publish(msg);
+        if (this.filter.passes(msg)) this.messageBus.publish(msg);
       });
 
       source.on('error', (err) => {

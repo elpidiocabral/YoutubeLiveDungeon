@@ -54,6 +54,7 @@ export class MockChatSource extends EventEmitter implements IChatSource {
       author,
       content: richContent.map((p) => p.value).join(''),
       richContent,
+      attachments: [],
       timestamp: new Date(),
       metadata: {
         isOwner: Math.random() < 0.1,

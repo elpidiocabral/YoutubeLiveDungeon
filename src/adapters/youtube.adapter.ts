@@ -31,6 +31,7 @@ export function adaptYouTubeChatItem(item: ChatItem): UnifiedChatMessage {
     },
     content: buildPlainText(item.message),
     richContent: buildRichContent(item.message),
+    attachments: [],
     timestamp: item.timestamp,
     metadata: {
       isOwner: item.isOwner,

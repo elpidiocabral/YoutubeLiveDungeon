@@ -62,6 +62,27 @@
     .badge { font-size: 10px; background: #1a1a2e; padding: 1px 6px; border-radius: 3px; margin-left: 5px; vertical-align: middle; }
     .superchat { color: #ffd700; font-weight: bold; margin-left: 6px; }
     #empty-state { color: #4a5568; font-size: 13px; text-align: center; padding: 32px 0; }
+
+    /* ── Author avatar ── */
+    .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: #0f3460; }
+
+    /* ── Attachments ── */
+    .attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .attachments img { max-width: 200px; max-height: 160px; border-radius: 4px; cursor: pointer;
+      border: 1px solid #334; object-fit: cover; }
+    .attachments img:hover { opacity: .85; }
+    .attach-file { font-size: 11px; color: #7289da; text-decoration: none; padding: 3px 8px;
+      background: #1a1a2e; border-radius: 3px; border: 1px solid #334; }
+    .attach-file:hover { background: #0f3460; }
+
+    /* ── Command prefix ── */
+    .prefix-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .prefix-row input { width: 60px; text-align: center; font-size: 16px; padding: 6px; }
+    #prefix-status { font-size: 12px; color: #a0aec0; }
+    #prefix-status.active { color: #f6c90e; }
+    .btn-apply { background: #6c63ff; color: #fff; }
+    .btn-clear { background: #4a5568; color: #eee; }
   </style>
 </head>
 <body>
@@ -83,6 +104,16 @@
           <button class="btn-stop"  id="btn-stop" disabled>■ Parar</button>
         </div>
         <div id="live-status">Nenhuma live ativa</div>
+      </div>
+
+      <div class="panel" style="margin-top:12px;">
+        <h3>Filtro de Comandos</h3>
+        <div class="prefix-row">
+          <input id="prefix-input" type="text" maxlength="3" placeholder="!" title="Prefixo de comando (ex: ! ou /)" />
+          <button class="btn-apply" id="btn-apply-prefix">Aplicar</button>
+          <button class="btn-clear" id="btn-clear-prefix">Limpar</button>
+        </div>
+        <div id="prefix-status">Sem filtro — capturando tudo</div>
       </div>
 
       <div class="panel" style="margin-top:12px;">
@@ -114,6 +145,7 @@
       wsStatus.textContent = `WebSocket: conectado  (id: ${socket.id})`;
       wsStatus.className = 'connected';
       refreshStatus();
+      loadCurrentPrefix();
     });
     socket.on('disconnect', () => {
       wsStatus.textContent = 'WebSocket: desconectado';
@@ -149,14 +181,80 @@
 
       const li = document.createElement('li');
       li.className = msg.source;
+
+      const avatarHtml = msg.author.avatarUrl
+        ? `<img class="avatar" src="${escHtml(msg.author.avatarUrl)}" alt="" loading="lazy" />`
+        : `<div class="avatar"></div>`;
+
+      const attachmentsHtml = (msg.attachments ?? []).map((a) => {
+        if (a.mediaType === 'image') {
+          return `<a href="${escHtml(a.url)}" target="_blank" rel="noopener">
+                    <img src="${escHtml(a.url)}" alt="${escHtml(a.name)}" loading="lazy" />
+                  </a>`;
+        }
+        return `<a class="attach-file" href="${escHtml(a.url)}" target="_blank" rel="noopener">📎 ${escHtml(a.name)}</a>`;
+      }).join('');
+
       li.innerHTML = `
         <div class="msg-meta">[${msg.source}] ${new Date(msg.timestamp).toLocaleTimeString()}</div>
-        <span class="msg-author">${escHtml(msg.author.name)}</span>${badges}:
-        <span class="msg-content">${escHtml(msg.content)}</span>
+        <div class="msg-header">
+          ${avatarHtml}
+          <span class="msg-author">${escHtml(msg.author.name)}</span>${badges}
+        </div>
+        ${msg.content ? `<span class="msg-content">${escHtml(msg.content)}</span>` : ''}
+        ${attachmentsHtml ? `<div class="attachments">${attachmentsHtml}</div>` : ''}
       `;
       log.prepend(li);
       if (log.children.length > 150) log.lastElementChild?.remove();
     });
+
+    // ── Command prefix ──────────────────────────────────────
+    const prefixInput  = document.getElementById('prefix-input');
+    const prefixStatus = document.getElementById('prefix-status');
+    const btnApply     = document.getElementById('btn-apply-prefix');
+    const btnClear     = document.getElementById('btn-clear-prefix');
+
+    async function applyPrefix(value) {
+      try {
+        const res  = await fetch(`${API}/api/settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commandPrefix: value || null }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          const p = data.settings.commandPrefix;
+          if (p) {
+            prefixStatus.textContent = `Filtrando: apenas mensagens que começam com "${p}"`;
+            prefixStatus.className = 'active';
+            prefixInput.value = p;
+          } else {
+            prefixStatus.textContent = 'Sem filtro — capturando tudo';
+            prefixStatus.className = '';
+            prefixInput.value = '';
+          }
+        }
+      } catch (err) {
+        prefixStatus.textContent = `Erro: ${err.message}`;
+      }
+    }
+
+    async function loadCurrentPrefix() {
+      try {
+        const res  = await fetch(`${API}/api/settings`);
+        const data = await res.json();
+        const p = data.commandPrefix;
+        if (p) {
+          prefixStatus.textContent = `Filtrando: apenas mensagens que começam com "${p}"`;
+          prefixStatus.className = 'active';
+          prefixInput.value = p;
+        }
+      } catch { /* servidor offline */ }
+    }
+
+    btnApply.addEventListener('click', () => applyPrefix(prefixInput.value.trim()));
+    btnClear.addEventListener('click', () => applyPrefix(null));
+    prefixInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnApply.click(); });
 
     // ── Live control ──────────────────────────────────────────
     const btnStart   = document.getElementById('btn-start');

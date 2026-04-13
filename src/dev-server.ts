@@ -15,7 +15,9 @@ import { ExpressServer } from './infrastructure/express.server';
 import { SocketServer, MessageBus } from './infrastructure/socket.server';
 import { ChatOrchestrator } from './services/chat.orchestrator';
 import { YouTubeLiveService } from './services/youtube-live.service';
+import { ChatFilter } from './services/chat-filter';
 import { createYoutubeRouter } from './api/youtube.controller';
+import { createSettingsRouter } from './api/settings.controller';
 import { MockChatSource } from './infrastructure/mock-chat.source';
 import { logger } from './utils/logger';
 
@@ -29,9 +31,13 @@ async function main(): Promise<void> {
   const messageBus = new MessageBus();
   new SocketServer(expressServer.httpServer, messageBus);
 
+  // ── Filtro de comandos (compartilhado entre todas as fontes) ─
+  const chatFilter = new ChatFilter();
+
   // ── YouTube controlado via API (sempre presente) ────────────
-  const youtubeLiveService = new YouTubeLiveService(messageBus);
+  const youtubeLiveService = new YouTubeLiveService(messageBus, chatFilter);
   expressServer.app.use('/api/youtube', createYoutubeRouter(youtubeLiveService));
+  expressServer.app.use('/api/settings', createSettingsRouter(chatFilter));
 
   await expressServer.listen();
 
@@ -45,7 +51,7 @@ async function main(): Promise<void> {
 
   if (useMock) {
     const mock = new MockChatSource(intervalMs);
-    const orchestrator = new ChatOrchestrator([mock], messageBus);
+    const orchestrator = new ChatOrchestrator([mock], messageBus, chatFilter);
     await orchestrator.startAll();
 
     const shutdown = (): void => {

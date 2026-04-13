@@ -1,5 +1,6 @@
 import { YouTubeChatClient } from '../infrastructure/youtube-chat.client';
 import type { IMessageBus } from '../core/ports';
+import type { ChatFilter } from './chat-filter';
 import { parseYouTubeLiveId } from '../utils/youtube-url';
 import { logger } from '../utils/logger';
 
@@ -12,7 +13,10 @@ export class YouTubeLiveService {
   private currentLiveId: string | undefined;
   private startedAt: Date | undefined;
 
-  constructor(private readonly messageBus: IMessageBus) {}
+  constructor(
+    private readonly messageBus: IMessageBus,
+    private readonly filter: ChatFilter
+  ) {}
 
   async startLive(
     urlOrId: string
@@ -38,7 +42,9 @@ export class YouTubeLiveService {
     this.currentLiveId = liveId;
     this.startedAt = new Date();
 
-    this.activeClient.on('message', (msg) => this.messageBus.publish(msg));
+    this.activeClient.on('message', (msg) => {
+      if (this.filter.passes(msg)) this.messageBus.publish(msg);
+    });
     this.activeClient.on('error', (err) => {
       logger.error('[YTLiveService] Erro no cliente', { message: err.message });
     });

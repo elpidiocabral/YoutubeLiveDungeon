@@ -6,17 +6,30 @@
 export type MessageSource = 'youtube' | 'discord';
 
 export interface RichContentPart {
-  type: 'text' | 'emoji';
-  /** Texto legível ou shortcode do emoji */
+  type: 'text' | 'emoji' | 'image';
+  /** Texto legível, shortcode do emoji ou nome do arquivo */
   value: string;
-  /** URL da imagem (apenas para type === 'emoji') */
+  /** URL da imagem (para type === 'emoji' ou 'image') */
   url?: string;
+  /** Dimensões originais, quando disponíveis (type === 'image') */
+  width?: number;
+  height?: number;
 }
 
 export interface SuperChatInfo {
   amount: string;
   currency: string;
   color: string;
+}
+
+export interface MessageAttachment {
+  url: string;
+  /** Nome original do arquivo */
+  name: string;
+  /** 'image' para fotos/GIFs, 'video' para vídeos, 'file' para outros */
+  mediaType: 'image' | 'video' | 'file';
+  width?: number;
+  height?: number;
 }
 
 export interface UnifiedChatMessage {
@@ -30,8 +43,10 @@ export interface UnifiedChatMessage {
   };
   /** Texto plano concatenado — conveniente para busca e logging */
   content: string;
-  /** Representação rica com partes de texto e emojis */
+  /** Representação rica com partes de texto, emojis e imagens */
   richContent: RichContentPart[];
+  /** Anexos de imagem enviados na mensagem (fotos, GIFs, etc.) */
+  attachments: MessageAttachment[];
   timestamp: Date;
   metadata: {
     isOwner: boolean;
